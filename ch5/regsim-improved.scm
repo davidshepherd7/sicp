@@ -90,10 +90,23 @@
                 (execute)))))
 
       (define (instruction-list)
-        (uniq (sort (map car the-instruction-sequence) less-than?)))
+        (uniq (sort (map instruction-text the-instruction-sequence) less-than?)))
 
       (define (entry-point-registers)
-        '(111))
+        ;; I need threading macros so badly :(
+        (map (lambda (exp) (register-exp-reg exp))
+             (filter (lambda (exp) (register-exp? exp))
+                     (map (lambda (inst) (car (instruction-execution-proc inst)))
+                          (filter (lambda (inst) (equal? (instruction-text inst) 'goto))
+                                  (instruction-list))))))
+
+      (define (stack-registers)
+        (uniq
+         ((lambda (l) (sort l less-than?)) ;; swap arg order for consistent data flow
+          (map (lambda (inst) (car (instruction-execution-proc inst)))
+               (filter (lambda (inst) (or (equal? (instruction-text inst) 'save)
+                                     (equal? (instruction-text inst) 'restore)))
+                       (instruction-list))))))
 
       (define (dispatch message)
         (cond ((eq? message 'start)
@@ -110,6 +123,7 @@
 
               ((eq? message 'instruction-list) (instruction-list))
               ((eq? message 'entry-point-registers) (entry-point-registers))
+              ((eq? message 'stack-registers) (stack-registers))
               (else (error "Unknown request -- MACHINE" message))))
       dispatch)))
 
@@ -449,5 +463,5 @@
 
 (pp (fib-machine 'instruction-list))
 (pp (fib-machine 'entry-point-registers))
-;; (pp (fib-machine 'stack-registers))
+(pp (fib-machine 'stack-registers))
 ;; (pp (fib-machine 'register-sources))
