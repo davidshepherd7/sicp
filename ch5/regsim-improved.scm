@@ -1,10 +1,7 @@
 ;; regsim with extension from ex12 and ex13.
 
-(define (make-machine register-names ops controller-text)
+(define (make-machine ops controller-text)
   (let ((machine (make-new-machine)))
-    (for-each (lambda (register-name)
-                ((machine 'allocate-register) register-name))
-              register-names)
     ((machine 'install-operations) ops)
     ((machine 'install-instruction-sequence)
      (assemble controller-text machine))
@@ -67,6 +64,7 @@
     (let ((the-ops
            (list (list 'initialize-stack (lambda () (stack 'initialize)))))
           (register-table (list (list 'pc pc) (list 'flag flag))))
+
       (define (allocate-register name)
         (if (assoc name register-table)
             (error "Multiply defined register: " name)
@@ -79,7 +77,8 @@
         (let ((val (assoc name register-table)))
           (if val
               (cadr val)
-              (error "Unknown register:" name))))
+              (begin (allocate-register name)
+                     (lookup-register name)))))
 
       (define (execute)
         (let ((insts (get-contents pc)))
@@ -448,7 +447,6 @@
 
 (define fib-machine
   (make-machine
-   '(n val continue)
    (list (list '< <) (list '- -) (list '+ +))
    '(start
      (assign continue (label fib-done))
@@ -486,3 +484,18 @@
 (pp (fib-machine 'entry-point-registers))
 (pp (fib-machine 'stack-registers))
 (pp (fib-machine 'register-sources))
+
+;; Try it out!
+(define (fib n)
+  (if (< n 2)
+      n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+(define (run-fib n)
+  (set-register-contents! fib-machine 'n n)
+  (start fib-machine)
+  (get-register-contents fib-machine 'val))
+
+(define args (list 0 1 2 3 4 5 6 7))
+(pp (map fib args))
+(pp (map run-fib args))
