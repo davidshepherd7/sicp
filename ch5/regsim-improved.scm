@@ -63,8 +63,7 @@
   (let ((pc (make-register 'pc))
         (flag (make-register 'flag))
         (stack (make-stack))
-        (the-instruction-sequence '())
-        (instruction-list '()))
+        (the-instruction-sequence '()))
     (let ((the-ops
            (list (list 'initialize-stack (lambda () (stack 'initialize)))))
           (register-table (list (list 'pc pc) (list 'flag flag))))
@@ -90,26 +89,27 @@
                 ((instruction-execution-proc (car insts)))
                 (execute)))))
 
-      (define (make-instruction-list)
-        (set! instruction-list
-              (uniq
-               (sort (map car the-instruction-sequence) less-than?))))
+      (define (instruction-list)
+        (uniq (sort (map car the-instruction-sequence) less-than?)))
+
+      (define (entry-point-registers)
+        '(111))
 
       (define (dispatch message)
         (cond ((eq? message 'start)
                (set-contents! pc the-instruction-sequence)
                (execute))
               ((eq? message 'install-instruction-sequence)
-               (lambda (seq)
-                 (set! the-instruction-sequence seq)
-                 (make-instruction-list)))
+               (lambda (seq) (set! the-instruction-sequence seq)))
               ((eq? message 'allocate-register) allocate-register)
               ((eq? message 'get-register) lookup-register)
               ((eq? message 'install-operations)
                (lambda (ops) (set! the-ops (append the-ops ops))))
               ((eq? message 'stack) stack)
               ((eq? message 'operations) the-ops)
-              ((eq? message 'instruction-list) instruction-list)
+
+              ((eq? message 'instruction-list) (instruction-list))
+              ((eq? message 'entry-point-registers) (entry-point-registers))
               (else (error "Unknown request -- MACHINE" message))))
       dispatch)))
 
@@ -399,7 +399,7 @@
         rest))
   (fold-right drop-if-equal '() l))
 
-(pp (uniq-fold '(1 1 2 3 3)))
+(pp (uniq '(1 1 2 3 3)))
 
 (pp (less-than? '(1 "a") '(1 "b"))) ; t
 (pp (less-than? '(1 2) '(1 2 3))) ; t
@@ -448,3 +448,6 @@
      fib-done)))
 
 (pp (fib-machine 'instruction-list))
+(pp (fib-machine 'entry-point-registers))
+;; (pp (fib-machine 'stack-registers))
+;; (pp (fib-machine 'register-sources))
