@@ -108,6 +108,12 @@
                                      (equal? (instruction-text inst) 'restore)))
                        (instruction-list))))))
 
+      (define (register-sources)
+        (group
+         (map cdr
+              (filter (lambda (inst) (equal? (instruction-text inst) 'assign))
+                      (instruction-list)))))
+
       (define (dispatch message)
         (cond ((eq? message 'start)
                (set-contents! pc the-instruction-sequence)
@@ -124,6 +130,7 @@
               ((eq? message 'instruction-list) (instruction-list))
               ((eq? message 'entry-point-registers) (entry-point-registers))
               ((eq? message 'stack-registers) (stack-registers))
+              ((eq? message 'register-sources) (register-sources))
               (else (error "Unknown request -- MACHINE" message))))
       dispatch)))
 
@@ -143,24 +150,24 @@
 
 (define (assemble controller-text machine)
   (extract-labels controller-text
-    (lambda (insts labels)
-      (update-insts! insts labels machine)
-      insts)))
+                  (lambda (insts labels)
+                    (update-insts! insts labels machine)
+                    insts)))
 
 (define (extract-labels text receive)
   (if (null? text)
       (receive '() '())
       (extract-labels (cdr text)
-       (lambda (insts labels)
-         (let ((next-inst (car text)))
-           (if (symbol? next-inst)
-               (receive insts
-                        (cons (make-label-entry next-inst
-                                                insts)
-                              labels))
-               (receive (cons (make-instruction next-inst)
-                              insts)
-                        labels)))))))
+                      (lambda (insts labels)
+                        (let ((next-inst (car text)))
+                          (if (symbol? next-inst)
+                              (receive insts
+                                       (cons (make-label-entry next-inst
+                                                               insts)
+                                             labels))
+                              (receive (cons (make-instruction next-inst)
+                                             insts)
+                                       labels)))))))
 
 (define (update-insts! insts labels machine)
   (let ((pc (get-register machine 'pc))
@@ -420,9 +427,23 @@
 (pp (less-than? '(1 2 3) '(1 2))) ; f
 (pp (less-than? '(2) '(1))) ; f
 
-
 
-;;; Testing
+(define (group lst_)
+  (define (group-rec lst out)
+    (if (null? lst)
+        out
+        (let ((x (car lst))
+              (rest (cdr lst)))
+          (let ((grp (assoc (car x) out)))
+            (if grp
+                (begin (set-cdr! grp (cons (cdr x) (cdr grp)))
+                       (group-rec rest out))
+                (group-rec rest (cons (cons (car x) (list (cdr x))) out)))))))
+
+  (group-rec lst_ '()))
+
+(pp (group '()))
+(pp (group '((1 1) (1 2 3) (10 1 1))))
 
 
 (define fib-machine
@@ -430,38 +451,38 @@
    '(n val continue)
    (list (list '< <) (list '- -) (list '+ +))
    '(start
-        (assign continue (label fib-done))
+     (assign continue (label fib-done))
      fib-loop
-        (test (op <) (reg n) (const 2))
-        (branch (label immediate-answer))
-        ;; set up to compute Fib(n-1)
-        (save continue)
-        (assign continue (label afterfib-n-1))
-        (save n)                           ; save old value of n
-        (assign n (op -) (reg n) (const 1)); clobber n to n-1
-        (goto (label fib-loop))            ; perform recursive call
+     (test (op <) (reg n) (const 2))
+     (branch (label immediate-answer))
+     ;; set up to compute Fib(n-1)
+     (save continue)
+     (assign continue (label afterfib-n-1))
+     (save n)                           ; save old value of n
+     (assign n (op -) (reg n) (const 1)); clobber n to n-1
+     (goto (label fib-loop))            ; perform recursive call
      afterfib-n-1                         ; upon return, val contains Fib(n-1)
-        (restore n)
-        (restore continue)
-        ;; set up to compute Fib(n-2)
-        (assign n (op -) (reg n) (const 2))
-        (save continue)
-        (assign continue (label afterfib-n-2))
-        (save val)                         ; save Fib(n-1)
-        (goto (label fib-loop))
+     (restore n)
+     (restore continue)
+     ;; set up to compute Fib(n-2)
+     (assign n (op -) (reg n) (const 2))
+     (save continue)
+     (assign continue (label afterfib-n-2))
+     (save val)                         ; save Fib(n-1)
+     (goto (label fib-loop))
      afterfib-n-2                         ; upon return, val contains Fib(n-2)
-        (assign n (reg val))               ; n now contains Fib(n-2)
-        (restore val)                      ; val now contains Fib(n-1)
-        (restore continue)
-        (assign val                        ; Fib(n-1)+Fib(n-2)
-                (op +) (reg val) (reg n))
-        (goto (reg continue))              ; return to caller, answer is in val
+     (assign n (reg val))               ; n now contains Fib(n-2)
+     (restore val)                      ; val now contains Fib(n-1)
+     (restore continue)
+     (assign val                        ; Fib(n-1)+Fib(n-2)
+             (op +) (reg val) (reg n))
+     (goto (reg continue))              ; return to caller, answer is in val
      immediate-answer
-        (assign val (reg n))               ; base case: Fib(n)=n
-        (goto (reg continue))
+     (assign val (reg n))               ; base case: Fib(n)=n
+     (goto (reg continue))
      fib-done)))
 
 (pp (fib-machine 'instruction-list))
 (pp (fib-machine 'entry-point-registers))
 (pp (fib-machine 'stack-registers))
-;; (pp (fib-machine 'register-sources))
+(pp (fib-machine 'register-sources))
