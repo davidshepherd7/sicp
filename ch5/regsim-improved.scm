@@ -1,4 +1,4 @@
-;; regsim with extension from ex12 and ex13.
+;; regsim with extensions from ex12 and ex13.
 
 (define (make-machine ops controller-text)
   (let ((machine (make-new-machine)))
@@ -27,7 +27,7 @@
 
 ;; stack
 
-;;**monitored version from section 5.2.4
+;; monitored version from section 5.2.4
 (define (make-stack)
   (let ((s '())
         (number-pushes 0)
@@ -464,59 +464,59 @@
 
 
 
-(define fib-machine
-  (make-machine
-   (list (list '< <) (list '- -) (list '+ +))
-   '(start
-     (assign continue (label fib-done))
-     fib-loop
-     (test (op <) (reg n) (const 2))
-     (branch (label immediate-answer))
-     ;; set up to compute Fib(n-1)
-     (save continue)
-     (assign continue (label afterfib-n-1))
-     (save n)                           ; save old value of n
-     (assign n (op -) (reg n) (const 1)); clobber n to n-1
-     (goto (label fib-loop))            ; perform recursive call
-     afterfib-n-1                         ; upon return, val contains Fib(n-1)
-     (restore n)
-     (restore continue)
-     ;; set up to compute Fib(n-2)
-     (assign n (op -) (reg n) (const 2))
-     (save continue)
-     (assign continue (label afterfib-n-2))
-     (save val)                         ; save Fib(n-1)
-     (goto (label fib-loop))
-     afterfib-n-2                         ; upon return, val contains Fib(n-2)
-     (assign n (reg val))               ; n now contains Fib(n-2)
-     (restore val)                      ; val now contains Fib(n-1)
-     (restore continue)
-     (assign val                        ; Fib(n-1)+Fib(n-2)
-             (op +) (reg val) (reg n))
-     (goto (reg continue))              ; return to caller, answer is in val
-     immediate-answer
-     (assign val (reg n))               ; base case: Fib(n)=n
-     (goto (reg continue))
-     fib-done)))
+;; (define fib-machine
+;;   (make-machine
+;;    (list (list '< <) (list '- -) (list '+ +))
+;;    '(start
+;;      (assign continue (label fib-done))
+;;      fib-loop
+;;      (test (op <) (reg n) (const 2))
+;;      (branch (label immediate-answer))
+;;      ;; set up to compute Fib(n-1)
+;;      (save continue)
+;;      (assign continue (label afterfib-n-1))
+;;      (save n)                           ; save old value of n
+;;      (assign n (op -) (reg n) (const 1)); clobber n to n-1
+;;      (goto (label fib-loop))            ; perform recursive call
+;;      afterfib-n-1                         ; upon return, val contains Fib(n-1)
+;;      (restore n)
+;;      (restore continue)
+;;      ;; set up to compute Fib(n-2)
+;;      (assign n (op -) (reg n) (const 2))
+;;      (save continue)
+;;      (assign continue (label afterfib-n-2))
+;;      (save val)                         ; save Fib(n-1)
+;;      (goto (label fib-loop))
+;;      afterfib-n-2                         ; upon return, val contains Fib(n-2)
+;;      (assign n (reg val))               ; n now contains Fib(n-2)
+;;      (restore val)                      ; val now contains Fib(n-1)
+;;      (restore continue)
+;;      (assign val                        ; Fib(n-1)+Fib(n-2)
+;;              (op +) (reg val) (reg n))
+;;      (goto (reg continue))              ; return to caller, answer is in val
+;;      immediate-answer
+;;      (assign val (reg n))               ; base case: Fib(n)=n
+;;      (goto (reg continue))
+;;      fib-done)))
 
-(pp (fib-machine 'instruction-list))
-(pp (fib-machine 'entry-point-registers))
-(pp (fib-machine 'stack-registers))
-(pp (fib-machine 'register-sources))
+;; (pp (fib-machine 'instruction-list))
+;; (pp (fib-machine 'entry-point-registers))
+;; (pp (fib-machine 'stack-registers))
+;; (pp (fib-machine 'register-sources))
 
-;; Try it out!
-(define (fib n)
-  (if (< n 2)
-      n
-      (+ (fib (- n 1)) (fib (- n 2)))))
+;; ;; Try it out!
+;; (define (fib n)
+;;   (if (< n 2)
+;;       n
+;;       (+ (fib (- n 1)) (fib (- n 2)))))
 
-(define (run-fib n)
-  (set-register-contents! fib-machine 'n n)
-  (start fib-machine)
-  ((fib-machine 'stack) 'print-statistics)
-  (get-register-contents fib-machine 'val)
-  )
+;; (define (run-fib n)
+;;   (set-register-contents! fib-machine 'n n)
+;;   (start fib-machine)
+;;   ((fib-machine 'stack) 'print-statistics)
+;;   (get-register-contents fib-machine 'val)
+;;   )
 
-(define args (list 0 1 2 3 4 5 6 7))
-(pp (map run-fib args))
-(pp (map fib args))
+;; (define args (list 0 1 2 3 4 5 6 7))
+;; (pp (map run-fib args))
+;; (pp (map fib args))
