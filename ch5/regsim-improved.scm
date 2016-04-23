@@ -1,4 +1,4 @@
-;; regsim with extensions from ex12 and ex13.
+;; regsim with extensions from ex12, ex13, ex15
 
 (define (make-machine ops controller-text)
   (let ((machine (make-new-machine)))
@@ -73,11 +73,38 @@
 
 
 
+;; Instruction counter
+
+(define (make-inst-counter)
+  (let ((n 0))
+
+    (define (increment)
+      (set! n (+ n 1)))
+
+    (define (clear)
+      (set! n 0))
+
+    (define (print-statistics)
+      (newline)
+      (display (list 'number-of-instructions '= n)))
+
+    (define (dispatch message)
+      (cond ((eq? message 'increment) (increment))
+            ((eq? message 'print-statistics) (print-statistics))
+            ((eq? message 'clear) (clear))
+            (else (error "Unknown request -- INSTRUCTION COUNTER" message))))
+
+    dispatch))
+
+
+
 (define (make-new-machine)
   (let ((pc (make-register 'pc))
         (flag (make-register 'flag))
         (stack (make-stack))
-        (the-instruction-sequence '()))
+        (the-instruction-sequence '())
+        (instruction-counter (make-inst-counter)))
+
     (let ((the-ops
            (list (list 'initialize-stack (lambda () (stack 'initialize)))
                  (list 'print-stack-statistics (lambda () (stack 'print-statistics)))))
@@ -148,7 +175,9 @@
               ((eq? message 'entry-point-registers) (entry-point-registers))
               ((eq? message 'stack-registers) (stack-registers))
               ((eq? message 'register-sources) (register-sources))
+              ((eq? message 'instruction-counter) instruction-counter)
               (else (error "Unknown request -- MACHINE" message))))
+
       dispatch)))
 
 
@@ -224,22 +253,27 @@
 
 (define (make-execution-procedure inst labels machine
                                   pc flag stack ops)
-  (cond ((eq? (car inst) 'assign)
-         (make-assign inst machine labels ops pc))
-        ((eq? (car inst) 'test)
-         (make-test inst machine labels ops flag pc))
-        ((eq? (car inst) 'branch)
-         (make-branch inst machine labels flag pc))
-        ((eq? (car inst) 'goto)
-         (make-goto inst machine labels pc))
-        ((eq? (car inst) 'save)
-         (make-save inst machine stack pc))
-        ((eq? (car inst) 'restore)
-         (make-restore inst machine stack pc))
-        ((eq? (car inst) 'perform)
-         (make-perform inst machine labels ops pc))
-        (else (error "Unknown instruction type -- ASSEMBLE"
-                     inst))))
+  (let ((exec
+         (cond ((eq? (car inst) 'assign)
+                (make-assign inst machine labels ops pc))
+               ((eq? (car inst) 'test)
+                (make-test inst machine labels ops flag pc))
+               ((eq? (car inst) 'branch)
+                (make-branch inst machine labels flag pc))
+               ((eq? (car inst) 'goto)
+                (make-goto inst machine labels pc))
+               ((eq? (car inst) 'save)
+                (make-save inst machine stack pc))
+               ((eq? (car inst) 'restore)
+                (make-restore inst machine stack pc))
+               ((eq? (car inst) 'perform)
+                (make-perform inst machine labels ops pc))
+               (else (error "Unknown instruction type -- ASSEMBLE"
+                            inst)))))
+
+    (lambda ()
+      ((machine 'instruction-counter) 'increment)
+      (exec))))
 
 
 (define (make-assign inst machine labels operations pc)
