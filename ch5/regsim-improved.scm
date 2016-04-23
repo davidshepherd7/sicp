@@ -8,13 +8,25 @@
     machine))
 
 (define (make-register name)
-  (let ((contents '*unassigned*))
+  (let ((contents '*unassigned*)
+        (tracing-enabled #f))
+
+    (define (print-register-trace name value contents)
+      (for-each display (list "Assigning to register: " name " " contents " -> " value))
+      (newline))
+
+    (define (set value)
+      (if tracing-enabled (print-register-trace name value contents))
+      (set! contents value))
+
     (define (dispatch message)
       (cond ((eq? message 'get) contents)
-            ((eq? message 'set)
-             (lambda (value) (set! contents value)))
+            ((eq? message 'set) set)
+            ((eq? message 'enable-tracing) (set! tracing-enabled #t))
+            ((eq? message 'disable-tracing) (set! tracing-enabled #f))
             (else
              (error "Unknown request -- REGISTER" message))))
+
     dispatch))
 
 (define (get-contents register)
@@ -284,10 +296,14 @@
             (if (machine 'tracing-enabled) (pp inst))))
       (exec))))
 
+(define (print-label-trace label)
+  (for-each display (list ";" label "\n")))
+
 (define (make-print-label-exec inst machine pc)
   (let ((label (cdr inst)))
     (lambda ()
-      (if (machine 'tracing-enabled) (pp label))
+      (if (machine 'tracing-enabled)
+          (print-label-trace label))
       (advance-pc pc))))
 
 
@@ -337,7 +353,7 @@
           (lambda ()
             (if (get-contents flag)
                 (begin
-                  (if (machine 'tracing-enabled) (pp (label-exp-label dest)))
+                  (if (machine 'tracing-enabled) (print-label-trace (label-exp-label dest)))
                   (set-contents! pc insts))
                 (advance-pc pc))))
         (error "Bad BRANCH instruction -- ASSEMBLE" inst))))
