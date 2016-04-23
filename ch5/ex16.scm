@@ -1,4 +1,4 @@
-;; Run as: scheme --load ./regsim-improved.scm --load ex15.scm
+;; Run as: scheme --load ./regsim-improved.scm --load ex16.scm
 
 (define factorial-machine
   (make-machine
@@ -26,15 +26,16 @@
      (goto (reg continue))                   ; return to caller
      fact-done)))
 
+
 (define (run-factorial n)
   (if (< n 1) (error "Min value 1"))
   ((factorial-machine 'stack) 'initialize)
-  ((factorial-machine 'instruction-counter) 'clear)
   (set-register-contents! factorial-machine 'n n)
+  (factorial-machine 'enable-tracing)
 
   (start factorial-machine)
 
-  ((factorial-machine 'instruction-counter) 'print-statistics)
+  (factorial-machine 'disable-tracing)
   (get-register-contents factorial-machine 'val))
 
 (define (factorial n)

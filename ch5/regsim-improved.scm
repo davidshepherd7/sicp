@@ -103,7 +103,8 @@
         (flag (make-register 'flag))
         (stack (make-stack))
         (the-instruction-sequence '())
-        (instruction-counter (make-inst-counter)))
+        (instruction-counter (make-inst-counter))
+        (tracing-enabled #f))
 
     (let ((the-ops
            (list (list 'initialize-stack (lambda () (stack 'initialize)))
@@ -176,6 +177,10 @@
               ((eq? message 'stack-registers) (stack-registers))
               ((eq? message 'register-sources) (register-sources))
               ((eq? message 'instruction-counter) instruction-counter)
+
+              ((eq? message 'enable-tracing) (set! tracing-enabled #t))
+              ((eq? message 'disable-tracing) (set! tracing-enabled #f))
+              ((eq? message 'tracing-enabled) tracing-enabled)
               (else (error "Unknown request -- MACHINE" message))))
 
       dispatch)))
@@ -208,11 +213,8 @@
                         (let ((next-inst (car text)))
                           (if (symbol? next-inst)
                               (receive insts
-                                       (cons (make-label-entry next-inst
-                                                               insts)
-                                             labels))
-                              (receive (cons (make-instruction next-inst)
-                                             insts)
+                                       (cons (make-label-entry next-inst insts) labels))
+                              (receive (cons (make-instruction next-inst) insts)
                                        labels)))))))
 
 (define (update-insts! insts labels machine)
@@ -224,9 +226,7 @@
      (lambda (inst)
        (set-instruction-execution-proc!
         inst
-        (make-execution-procedure
-         (instruction-text inst) labels machine
-         pc flag stack ops)))
+        (make-execution-procedure (instruction-text inst) labels machine pc flag stack ops)))
      insts)))
 
 (define (make-instruction text)
@@ -273,6 +273,7 @@
 
     (lambda ()
       ((machine 'instruction-counter) 'increment)
+      (if (machine 'tracing-enabled) (pp inst))
       (exec))))
 
 
