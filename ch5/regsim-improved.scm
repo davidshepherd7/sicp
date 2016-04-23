@@ -116,6 +116,8 @@
         (stack (make-stack))
         (the-instruction-sequence '())
         (instruction-counter (make-inst-counter))
+        (labels '())
+        (break #f)
         (tracing-enabled #f))
 
     (let ((the-ops
@@ -140,11 +142,11 @@
 
       (define (execute)
         (let ((insts (get-contents pc)))
-          (if (null? insts)
-              'done
-              (begin
-                ((instruction-execution-proc (car insts)))
-                (execute)))))
+          (cond ((null? insts) 'done)
+                (break 'break)
+                (else
+                 ((instruction-execution-proc (car insts)))
+                 (execute)))))
 
       (define (instruction-list)
         (uniq (sort (map instruction-text the-instruction-sequence) less-than?)))
@@ -171,6 +173,38 @@
               (filter (lambda (inst) (equal? (instruction-text inst) 'assign))
                       (instruction-list)))))
 
+      (define (set-breakpoint label n)
+        (splice! (lookup-label labels label) n (make-breakpoint label n)))
+
+      (define (cancel-breakpoint label n)
+        (let ((bp-label (lookup-label labels label)))
+          (if (not (breakpoint? (nth bp-label n)))
+              (error "Can't cancel breakpoint because not a breakpoint" label n))
+          (delete-nth! bp-label n)))
+
+      (define (cancel-all-breakpoints)
+        ;; Like a shitty mutating filter function
+        (define (cab-rec insts)
+          (if (null? insts)
+              'done
+              (begin
+                (if (breakpoint? (car insts))
+                    (delete-nth! insts 0))
+                (cab-rec (cdr insts)))))
+
+        (cab-rec the-instruction-sequence))
+
+      (define (breakpoint? inst)
+        (and (not (null? inst)) (eq? (car inst) 'break)))
+
+      (define (make-breakpoint label n)
+        (cons 'break
+              (lambda ()
+                (set! break #t)
+                (map display (list "Hit breakpoint at label " label " with offset " n "\n"))
+                (map display (list "Next instruction " (instruction-text (caddr (get-contents pc))) "\n"))
+                (advance-pc pc))))
+
       (define (dispatch message)
         (cond ((eq? message 'start)
                (set-contents! pc the-instruction-sequence)
@@ -183,6 +217,7 @@
                (lambda (ops) (set! the-ops (append the-ops ops))))
               ((eq? message 'stack) stack)
               ((eq? message 'operations) the-ops)
+              ((eq? message 'set-labels) (lambda (new-labels) (set! labels new-labels)))
 
               ((eq? message 'instruction-list) (instruction-list))
               ((eq? message 'entry-point-registers) (entry-point-registers))
@@ -193,6 +228,12 @@
               ((eq? message 'enable-tracing) (set! tracing-enabled #t))
               ((eq? message 'disable-tracing) (set! tracing-enabled #f))
               ((eq? message 'tracing-enabled) tracing-enabled)
+
+              ((eq? message 'set-breakpoint) set-breakpoint)
+              ((eq? message 'cancel-breakpoint) cancel-breakpoint)
+              ((eq? message 'cancel-all-breakpoints) (cancel-all-breakpoints))
+              ((eq? message 'proceed) (set! break #f) (execute))
+
               (else (error "Unknown request -- MACHINE" message))))
 
       dispatch)))
@@ -215,6 +256,7 @@
   (extract-labels controller-text
                   (lambda (insts labels)
                     (update-insts! insts labels machine)
+                    ((machine 'set-labels) labels)
                     insts)))
 
 (define (extract-labels text receive)
@@ -462,6 +504,24 @@
     (if val
         (cadr val)
         (error "Unknown operation -- ASSEMBLE" symbol))))
+
+
+
+;; breakpoints
+
+(define (set-breakpoint machine label n)
+  ((machine 'set-breakpoint) label n))
+
+(define (proceed-machine machine)
+  (machine 'proceed))
+
+(define (cancel-breakpoint machine label n)
+  ((machine 'cancel-breakpoint) label n))
+
+(define (cancel-all-breakpoints machine)
+  (machine 'cancel-all-breakpoints))
+
+
 
 ;; from 4.1
 (define (tagged-list? exp tag)
@@ -528,6 +588,54 @@
 
 ;; (pp (group '()))
 ;; (pp (group '((1 1) (1 2 3) (10 1 1))))
+
+(define (nth-tail lst n)
+  (if (eq? n 0)
+      lst
+      (nth-tail (cdr lst) (- n 1))))
+
+(define (nth lst n)
+  (car (nth-tail lst n)))
+
+(define (splice! lst n x)
+  (if (eq? n 0)
+      (let ((front (car lst)))
+        (set-car! lst x)
+        (set-cdr! lst (cons front (cdr lst))))
+      (let ((splice-point (nth-tail lst (- n 1))))
+        (set-cdr! splice-point
+                  (cons x (cdr splice-point))))))
+
+;; (map (lambda (i)
+;;        (let ((lst (list-copy '("a" "b" "c"))))
+;;          (let ((other lst))
+;;            (splice! lst i "X")
+;;            (pp lst)
+;;            (pp other))))
+;;      '(0 1 2 3))
+
+(define (delete-nth! lst n)
+  (cond
+   ;; Tricky case
+   ((eq? n 0)
+    (set-car! lst (cadr lst))
+    (set-cdr! lst (cddr lst)))
+
+   ;; Easy case
+   ((eq? n 1) (set-cdr! lst (cddr lst)))
+
+   ;; Reduce nth to easy case
+   (else (delete-nth! (nth-tail lst (- n 1)) 1))))
+
+
+;; (map (lambda (i)
+;;        (let ((lst (list-copy '("a" "b" "c" "d"))))
+;;          (let ((other lst))
+;;            (delete-nth! lst i)
+;;            (pp lst)
+;;            (pp other))))
+;;      '(0 1 2 3))
+
 
 
 
