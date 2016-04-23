@@ -212,7 +212,7 @@
                       (lambda (insts labels)
                         (let ((next-inst (car text)))
                           (if (symbol? next-inst)
-                              (receive insts
+                              (receive (cons (make-print-label next-inst) insts)
                                        (cons (make-label-entry next-inst insts) labels))
                               (receive (cons (make-instruction next-inst) insts)
                                        labels)))))))
@@ -241,6 +241,9 @@
 (define (set-instruction-execution-proc! inst proc)
   (set-cdr! inst proc))
 
+(define (make-print-label label)
+  (list (cons 'print-label label)))
+
 (define (make-label-entry label-name insts)
   (cons label-name insts))
 
@@ -268,13 +271,24 @@
                 (make-restore inst machine stack pc))
                ((eq? (car inst) 'perform)
                 (make-perform inst machine labels ops pc))
+               ((eq? (car inst) 'print-label)
+                (make-print-label-exec inst machine pc))
                (else (error "Unknown instruction type -- ASSEMBLE"
                             inst)))))
 
     (lambda ()
-      ((machine 'instruction-counter) 'increment)
-      (if (machine 'tracing-enabled) (pp inst))
+      ;; Tracing stuff shouldn't include the tracing instructions themselves
+      (if (not (eq? (car inst) 'print-label))
+          (begin
+            ((machine 'instruction-counter) 'increment)
+            (if (machine 'tracing-enabled) (pp inst))))
       (exec))))
+
+(define (make-print-label-exec inst machine pc)
+  (let ((label (cdr inst)))
+    (lambda ()
+      (if (machine 'tracing-enabled) (pp label))
+      (advance-pc pc))))
 
 
 (define (make-assign inst machine labels operations pc)
@@ -322,7 +336,9 @@
                (lookup-label labels (label-exp-label dest))))
           (lambda ()
             (if (get-contents flag)
-                (set-contents! pc insts)
+                (begin
+                  (if (machine 'tracing-enabled) (pp (label-exp-label dest)))
+                  (set-contents! pc insts))
                 (advance-pc pc))))
         (error "Bad BRANCH instruction -- ASSEMBLE" inst))))
 

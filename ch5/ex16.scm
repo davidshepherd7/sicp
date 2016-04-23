@@ -1,5 +1,7 @@
 ;; Run as: scheme --load ./regsim-improved.scm --load ex16.scm
 
+;; Also demos ex17
+
 (define factorial-machine
   (make-machine
    (list (list '= =) (list '- -) (list '* *))
