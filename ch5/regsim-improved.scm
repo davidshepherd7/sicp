@@ -492,6 +492,8 @@
   (let ((op (lookup-prim (operation-exp-op exp) operations))
         (aprocs
          (map (lambda (e)
+                (if (label-exp? e)
+                    (error "Tried to perform an operation on a label"))
                 (make-primitive-exp e machine labels))
               (operation-exp-operands exp))))
     (lambda ()
