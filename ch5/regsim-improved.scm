@@ -24,6 +24,7 @@
             ((eq? message 'set) set)
             ((eq? message 'enable-tracing) (set! tracing-enabled #t))
             ((eq? message 'disable-tracing) (set! tracing-enabled #f))
+            ((eq? message 'name) name)
             (else
              (error "Unknown request -- REGISTER" message))))
 
@@ -427,15 +428,20 @@
   (let ((reg (get-register machine
                            (stack-inst-reg-name inst))))
     (lambda ()
-      (push stack (get-contents reg))
+      (push stack (cons (get-contents reg) (reg 'name)))
       (advance-pc pc))))
 
 (define (make-restore inst machine stack pc)
   (let ((reg (get-register machine
                            (stack-inst-reg-name inst))))
     (lambda ()
-      (set-contents! reg (pop stack))
-      (advance-pc pc))))
+      (let ((val-reg (pop stack)))
+        (if (not (eq? (reg 'name) (cdr val-reg)))
+            (error "Restoring into " (reg 'name)
+                   " but should be restored into " (cdr val-reg)
+                   " value: " (car val-reg)))
+        (set-contents! reg (car val-reg))
+        (advance-pc pc)))))
 
 (define (stack-inst-reg-name stack-instruction)
   (cadr stack-instruction))
